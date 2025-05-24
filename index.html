@@ -1,0 +1,101 @@
+<script type="module">
+  // Import Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, getDocs, deleteDoc, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+
+  // Config Firebase
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const loginSection = document.createElement("section");
+  loginSection.innerHTML = `
+    <h2>Connexion Admin</h2>
+    <input type="email" id="email" placeholder="Email admin">
+    <input type="password" id="password" placeholder="Mot de passe">
+    <button onclick="seConnecter()">Connexion</button>
+    <button onclick="seDeconnecter()">Déconnexion</button>
+    <p id="etatConnexion"></p>
+  `;
+  document.body.prepend(loginSection);
+
+  window.seConnecter = async () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      document.getElementById("etatConnexion").textContent = "Connecté";
+      chargerPDJ();
+    } catch (e) {
+      alert("Erreur de connexion : " + e.message);
+    }
+  };
+
+  window.seDeconnecter = async () => {
+    await signOut(auth);
+    document.getElementById("etatConnexion").textContent = "Déconnecté";
+    document.getElementById("pdj-list").innerHTML = "";
+  };
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      document.getElementById("etatConnexion").textContent = "Connecté en tant que " + user.email;
+      chargerPDJ();
+    } else {
+      document.getElementById("etatConnexion").textContent = "Non connecté";
+    }
+  });
+
+  const pdjRef = collection(db, "pdj");
+
+  window.ajouterPDJ = async () => {
+    const input = document.getElementById("nouveauPdj");
+    const valeur = input.value.trim();
+    if (valeur !== '') {
+      await addDoc(pdjRef, { nom: valeur });
+      input.value = '';
+      chargerPDJ();
+    }
+  };
+
+  async function chargerPDJ() {
+    const snapshot = await getDocs(pdjRef);
+    const list = document.getElementById("pdj-list");
+    list.innerHTML = '';
+    snapshot.forEach(docSnap => {
+      const item = docSnap.data();
+      const li = document.createElement("li");
+      li.className = "pdj-item";
+      li.innerHTML = `
+        <span>${item.nom}</span>
+        <span class="pdj-actions">
+          <button class="edit-btn" onclick="modifierPDJ('${docSnap.id}', '${item.nom}')">Modifier</button>
+          <button class="delete-btn" onclick="supprimerPDJ('${docSnap.id}')">Supprimer</button>
+        </span>`;
+      list.appendChild(li);
+    });
+  }
+
+  window.supprimerPDJ = async (id) => {
+    await deleteDoc(doc(db, "pdj", id));
+    chargerPDJ();
+  };
+
+  window.modifierPDJ = async (id, currentName) => {
+    const nouvelleValeur = prompt("Modifier l'élément :", currentName);
+    if (nouvelleValeur && nouvelleValeur.trim() !== '') {
+      await updateDoc(doc(db, "pdj", id), { nom: nouvelleValeur.trim() });
+      chargerPDJ();
+    }
+  };
+</script>
